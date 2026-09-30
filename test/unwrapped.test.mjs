@@ -131,3 +131,22 @@ test("an empty folder is an error, not a crash", () => {
   assert.equal(err.status, 1);
   assert.match(String(err.stderr), /No projects\/ folder/);
 });
+
+test("captions: numbers filled in, X always fits 280", async () => {
+  const { posts, postFile, X_LIMIT } = await import("../lib/posts.mjs");
+  const p = posts(story);
+  assert.match(p.linkedin, /npx claude-unwrapped/);
+  assert.match(p.linkedin, new RegExp(story.archetype.name));
+  assert.match(p.x, /npx claude-unwrapped/);
+  const huge = { ...story, archetype: { name: "The Backseat Driver", line: "x" },
+    you: { ...story.you, catchphrase: { text: "a".repeat(28), count: 99999 } },
+    peak: { count: 12 }, time: { ...story.time, hours: 99999 }, tokens: { ...story.tokens, total: 9.9e12 }, cost: { usd: 9.9e9 } };
+  assert.ok(posts(huge).x.length <= X_LIMIT);
+  assert.match(postFile(p), /LINKEDIN[\s\S]*X \/ TWITTER/);
+});
+
+test("the story page carries the captions for its share buttons", () => {
+  const html = render(story);
+  assert.match(html, /"posts":\{"linkedin":/);
+  assert.match(html, /x\.com\/intent\/post/);
+});

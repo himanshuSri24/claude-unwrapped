@@ -182,8 +182,10 @@
     font: 600 1.9cqh/1 var(--sans); padding: 1.8cqh 0; border-radius: 99px; cursor: pointer;
     border: 2px solid var(--ink); background: transparent; color: var(--ink); transition: transform .15s;
   }
-  .actions button.primary { background: var(--ink); color: var(--paper); grid-column: span 2; }
+  .actions button.primary { background: var(--ink); color: var(--paper); }
   .actions button:active { transform: scale(.97); }
+  .credit { display: block; margin-top: 2.2cqh; text-align: center; font: 500 1.45cqh/1 var(--mono); color: var(--ink); opacity: .45; text-decoration: none; }
+  .credit:hover { opacity: .8; }
   .toast { position: absolute; left: 50%; bottom: 3cqh; transform: translateX(-50%); background: var(--ink); color: var(--paper); font: 500 1.7cqh/1 var(--sans); padding: 1.4cqh 3cqw; border-radius: 99px; opacity: 0; transition: opacity .25s; z-index: 50; pointer-events: none; }
   .toast.show { opacity: 1; }
 
@@ -301,7 +303,7 @@ function buildSlides(S) {
       <div class="lead rise" style="--d:100">Your Claude hour is</div>
       <div class="big mid rise" style="--d:200"><em>${hourName(S.time.peakHour)}</em></div>
       <svg class="clock" viewBox="-16 -8 232 216">${wedges}${ticks}</svg>
-      <div class="note rise" style="--d:1200">${night >= 5 ? `<b>${night}%</b> of your prompts were sent between 10 PM and 5 AM. ` : ""}${S.time.latest ? `Latest one: <b>${clock(S.time.latest)}</b>, ${DAYS[new Date(S.time.latest).getDay()]} ${dshort(S.time.latest)}.` : ""}</div>`, 7500);
+      <div class="note rise" style="--d:1200">${night >= 5 ? `<b>${night}%</b> of your prompts were sent between 10 PM and 5 AM. ` : ""}${S.time.latest ? `Your latest night: still prompting at <b>${clock(S.time.latest)}</b> on ${DAYS[new Date(S.time.latest).getDay()]} ${dshort(S.time.latest)}.` : ""}</div>`, 7500);
   }
 
   if (S.tokens.total > 0) {
@@ -399,10 +401,12 @@ function buildSlides(S) {
   add("share", `
     <canvas id="card" width="1080" height="1350"></canvas>
     <div class="actions">
-      <button class="primary" id="save">Save image</button>
-      <button id="copy">Copy text</button>
+      <button class="primary" id="post-x">Post on X</button>
+      <button class="primary" id="post-li">Post on LinkedIn</button>
+      <button id="save">Save image</button>
       <button id="replay">Watch again</button>
-    </div>`, 0);
+    </div>
+    <a class="credit" href="https://devwithcoffee.com" target="_blank" rel="noopener">made by devwithcoffee</a>`, 0);
   return out;
 }
 
@@ -468,24 +472,16 @@ function drawCard(S) {
 
   g.font = "600 25px 'JetBrains Mono'"; g.fillStyle = "#8a7f70";
   g.fillText("npx claude-unwrapped", P, H - 50);
-  g.textAlign = "right"; g.fillText("nothing left my machine", W - P, H - 50); g.textAlign = "left";
+  g.textAlign = "right"; g.fillText("by devwithcoffee", W - P, H - 50); g.textAlign = "left";
 }
 
-function shareText(S) {
-  const t = compact(S.tokens.total);
-  return [
-    `My Claude Code, unwrapped (${S.range.first ? dshort(S.range.first) + " – " + dlong(S.range.last) : ""}):`,
-    ``,
-    `${S.time.hours >= 10 ? int(S.time.hours) : S.time.hours.toFixed(1)} hours with Claude`,
-    `${t.num} ${t.word} tokens (${usd(S.cost.usd)} at API prices)`,
-    S.peak.count >= 2 ? `${S.peak.count} Claudes running at once, at peak` : null,
-    S.you.catchphrase ? `catchphrase: "${S.you.catchphrase.text}" × ${S.you.catchphrase.count}` : null,
-    ``,
-    `I'm ${S.archetype.name}.`,
-    ``,
-    `npx claude-unwrapped`,
-  ].filter((x) => x !== null).join("\n");
-}
+// Captions come from lib/posts.mjs so the story, post.txt and the clipboard
+// all say the same thing.
+const POSTS = (STORY && STORY.posts) || { x: "npx claude-unwrapped", linkedin: "npx claude-unwrapped" };
+const COMPOSE = {
+  x: (t) => `https://x.com/intent/post?text=${encodeURIComponent(t)}`,
+  linkedin: (t) => `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(t)}`,
+};
 
 // ---------- player ----------
 const frame = document.getElementById("frame");
@@ -563,18 +559,26 @@ else {
     else if (e.key === "p") pause(!paused);
   });
 
-  const toast = (msg) => { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
+  const toast = (msg, ms = 1800) => { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); };
+  const saveCard = () => {
+    const a = document.createElement("a");
+    a.download = "claude-unwrapped.png";
+    a.href = document.getElementById("card").toDataURL("image/png");
+    a.click();
+  };
+  // Neither site lets a link attach an image, so: save the card, copy the
+  // caption (LinkedIn sometimes drops prefilled text), open the composer.
+  const post = async (where) => {
+    saveCard();
+    try { await navigator.clipboard.writeText(POSTS[where]); } catch { /* the prefill still carries it */ }
+    window.open(COMPOSE[where](POSTS[where]), "_blank", "noopener");
+    toast("Card saved and caption copied. Attach claude-unwrapped.png", 4200);
+  };
   document.addEventListener("click", async (e) => {
-    if (e.target.id === "save") {
-      const a = document.createElement("a");
-      a.download = "claude-unwrapped.png";
-      a.href = document.getElementById("card").toDataURL("image/png");
-      a.click();
-      toast("Saved claude-unwrapped.png");
-    } else if (e.target.id === "copy") {
-      try { await navigator.clipboard.writeText(shareText(STORY)); toast("Copied. Paste it with the image."); }
-      catch { toast("Clipboard blocked by the browser"); }
-    } else if (e.target.id === "replay") show(0);
+    if (e.target.id === "post-x") post("x");
+    else if (e.target.id === "post-li") post("linkedin");
+    else if (e.target.id === "save") { saveCard(); toast("Saved claude-unwrapped.png"); }
+    else if (e.target.id === "replay") show(0);
   });
 
   const start = parseInt(q.get("slide") ?? location.hash.slice(1), 10);
