@@ -67,9 +67,9 @@ test("catchphrase needs 3+ repeats and never looks like a path or a secret", () 
   assert.deepEqual(catchphrase([...p("continue", 3), ...p("ok do it", 5)]), { text: "ok do it", count: 5 });
 });
 
-test("private mode drops names", () => {
+test("private mode drops names but keeps the (already filtered) catchphrase", () => {
   const s = buildStory(tot, { privateMode: true });
-  assert.equal(s.you.catchphrase, null);
+  assert.equal(s.you.catchphrase.text, "go on");
   assert.equal(s.claude.topFile.name, "one file");
   assert.ok(s.projects.every((p) => p.name.startsWith("project ")));
 });
@@ -117,6 +117,11 @@ test("cli --json runs end to end", () => {
   const s = JSON.parse(out);
   assert.equal(s.sessions.yours, 2);
   assert.ok(s.archetype.name);
+});
+
+test("--demo needs no logs", () => {
+  const out = execFileSync(process.execPath, [join(here, "..", "bin", "claude-unwrapped.mjs"), "--demo", "--json"], { encoding: "utf8" });
+  assert.equal(JSON.parse(out).demo, true);
 });
 
 test("an empty folder is an error, not a crash", () => {

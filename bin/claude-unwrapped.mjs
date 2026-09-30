@@ -14,6 +14,7 @@ import { tmpdir } from "node:os";
 import { readAll, defaultRoots } from "../lib/read.mjs";
 import { buildStory } from "../lib/stats.mjs";
 import { render } from "../lib/render.mjs";
+import { demoStory } from "../lib/demo.mjs";
 import { summary } from "../lib/terminal.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -33,7 +34,8 @@ const HELP = `
     --days <n>       Only the last n days (default: everything on disk)
     --dir <path>     A Claude config folder to read (repeatable; default:
                      $CLAUDE_CONFIG_DIR and ~/.claude)
-    --private        Hide project and file names and your catchphrase
+    --private        Hide project and file names (safe to post)
+    --demo           Show a made-up story, no logs needed
     --out <file>     Where to write the story (default: a temp file)
     --json           Print the numbers as JSON instead
     --no-open        Do not open a browser
@@ -42,7 +44,7 @@ const HELP = `
 `;
 
 function parseArgs(argv) {
-  const o = { days: null, dirs: [], privateMode: false, out: null, json: false, open: true };
+  const o = { days: null, dirs: [], privateMode: false, demo: false, out: null, json: false, open: true };
   const val = (i, a, flag) => (a.includes("=") ? a.slice(flag.length + 1) : argv[i + 1]);
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -52,6 +54,7 @@ function parseArgs(argv) {
     else if (a === "--dir" || a.startsWith("--dir=")) { o.dirs.push(val(i, a, "--dir")); if (!a.includes("=")) i++; }
     else if (a === "--out" || a.startsWith("--out=")) { o.out = val(i, a, "--out"); if (!a.includes("=")) i++; }
     else if (a === "--private") o.privateMode = true;
+    else if (a === "--demo") o.demo = true;
     else if (a === "--json") o.json = true;
     else if (a === "--no-open") o.open = false;
     else { console.error(`Unknown option ${a}. Try --help.`); process.exit(2); }
@@ -70,7 +73,21 @@ function openInBrowser(file) {
   } catch { /* headless machine: the path is printed anyway */ }
 }
 
+function finish(story) {
+  if (opts.json) {
+    process.stdout.write(JSON.stringify(story, null, 2) + "\n");
+    process.exit(0);
+  }
+  const out = resolve(opts.out || join(tmpdir(), "claude-unwrapped.html"));
+  writeFileSync(out, render(story));
+  process.stdout.write(summary(story, out));
+  if (opts.open) openInBrowser(out);
+  process.exit(0);
+}
+
 const opts = parseArgs(process.argv.slice(2));
+if (opts.demo) finish(demoStory());
+
 const roots = opts.dirs.length ? opts.dirs.map((d) => resolve(d)) : defaultRoots();
 const found = roots.filter((r) => existsSync(join(r, "projects")));
 if (!found.length) {
@@ -88,14 +105,4 @@ const tot = await readAll(found, {
 });
 if (tty) process.stderr.write("\r\x1b[K");
 
-const story = buildStory(tot, { privateMode: opts.privateMode });
-
-if (opts.json) {
-  process.stdout.write(JSON.stringify(story, null, 2) + "\n");
-  process.exit(0);
-}
-
-const out = resolve(opts.out || join(tmpdir(), "claude-unwrapped.html"));
-writeFileSync(out, render(story));
-process.stdout.write(summary(story, out));
-if (opts.open) openInBrowser(out);
+finish(buildStory(tot, { privateMode: opts.privateMode }));

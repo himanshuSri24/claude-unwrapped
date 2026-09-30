@@ -384,8 +384,8 @@ function buildSlides(S) {
       <div class="kicker rise">where it went</div>
       <div class="lead rise" style="--d:100">Claude touched</div>
       <div class="big mid rise" style="--d:200">${S.projectCount} <span class="unit">projects</span></div>
-      <div class="note rise" style="--d:350">Most edits landed here:</div>
-      <div class="rows">${rows}</div>`);
+      ${S.private ? `<div class="note rise" style="--d:350">Names hidden: this is the private version.</div>` : `<div class="note rise" style="--d:350">Most edits landed here:</div>`}
+      ${S.private ? "" : `<div class="rows">${rows}</div>`}`);
   }
 
   const a = S.archetype;
@@ -502,7 +502,7 @@ else {
   const slides = buildSlides(STORY);
   const host = document.getElementById("slides");
   host.innerHTML = slides.map((s, i) => `<section class="slide ${s.cls}" data-i="${i}">${s.html}<div class="nav"><div data-go="-1"></div><div data-go="1"></div></div></section>`).join("");
-  document.getElementById("brandRange").textContent = STORY.private ? "private mode" : "";
+  document.getElementById("brandRange").textContent = STORY.demo ? "demo data" : STORY.private ? "private mode" : "";
   const bars = document.getElementById("bars");
   bars.innerHTML = slides.map(() => "<i><b></b></i>").join("");
   const els = [...host.children], barEls = [...bars.children];
