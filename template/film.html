@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>claude-unwrapped film</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --paper:#f2ece0; --paper2:#e8e0cf; --ink:#17130e; --red:#ff4a1c; --butter:#ffd84a; --ease:cubic-bezier(.2,.8,.2,1); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:540px; height:675px; overflow:hidden; background:var(--paper); color:var(--ink); font-family:"Inter Tight",sans-serif; -webkit-font-smoothing:antialiased; }
+  .grain { position:absolute; inset:0; pointer-events:none; z-index:50; mix-blend-mode:multiply; opacity:.35;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .45  0 0 0 0 .4  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  .scene { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .45s var(--ease); }
+  .scene.on { opacity:1; }
+  .mark { position:absolute; top:22px; left:26px; right:26px; display:flex; justify-content:space-between; font:600 10.5px/1 "JetBrains Mono"; letter-spacing:.03em; z-index:40; }
+  .mark span:last-child { opacity:.5; }
+
+  /* 1. hook */
+  .hook { display:flex; flex-direction:column; justify-content:center; padding:0 34px; }
+  .hook .l { font:400 64px/.92 "Instrument Serif"; letter-spacing:-.03em; opacity:0; transform:translateY(18px); }
+  .hook .l.i { font-style:italic; color:var(--red); }
+  .hook.on .l { animation:rise .8s var(--ease) forwards; }
+  .hook .sub { margin-top:26px; font:500 13px/1.5 "JetBrains Mono"; opacity:0; }
+  .hook.on .sub { animation:rise .8s var(--ease) 1.6s forwards; }
+  @keyframes rise { to { opacity:1; transform:none; } }
+
+  /* 2. terminal */
+  .termScene { display:grid; place-items:center; background:#1b1712; }
+  .term { width:470px; background:var(--ink); border:1.5px solid #3a3228; border-radius:14px; padding:20px 20px 22px; color:var(--paper);
+    font:400 12.2px/1.75 "JetBrains Mono"; white-space:pre; box-shadow:0 30px 70px rgba(0,0,0,.5); transform:scale(.96); transition:transform 4s linear; }
+  .termScene.on .term { transform:scale(1.02); }
+  .term .dots { opacity:.4; letter-spacing:.3em; margin-bottom:10px; font-size:10px; }
+  .p { color:var(--butter); } .r { color:var(--red); font-weight:700; }
+  .cur::after { content:"▋"; animation:bl 1s steps(1) infinite; } @keyframes bl { 50% { opacity:0; } }
+  .ln { opacity:0; } .ln.on { opacity:1; transition:opacity .2s; }
+  .termScene .cap { position:absolute; bottom:34px; left:0; right:0; text-align:center; color:var(--paper); font:500 12px/1 "JetBrains Mono"; opacity:.55; }
+
+  /* 3. story on a phone */
+  .storyScene { background:var(--paper2); }
+  .phone { position:absolute; left:50%; top:88px; width:296px; height:526px; transform:translateX(-50%); border-radius:30px; background:#0e0c09; padding:7px;
+    box-shadow:0 30px 60px rgba(23,19,14,.28), 0 0 0 1.5px #2a241c; transition:transform .9s var(--ease); }
+  .phone iframe { width:100%; height:100%; border:0; border-radius:24px; background:var(--paper); }
+  .caption { position:absolute; top:44px; left:0; right:0; text-align:center; font:400 27px/1 "Instrument Serif"; letter-spacing:-.01em; }
+  .caption em { font-style:italic; color:var(--red); }
+  .caption span { display:inline-block; transition:opacity .25s, transform .35s var(--ease); }
+  .caption span.out { opacity:0; transform:translateY(8px); }
+  .count { position:absolute; bottom:24px; left:0; right:0; text-align:center; font:600 10.5px/1 "JetBrains Mono"; opacity:.5; }
+
+  /* 4. card */
+  .cardScene { display:grid; place-items:center; background:var(--red); }
+  .cardScene img { width:372px; border-radius:10px; box-shadow:0 35px 70px rgba(23,19,14,.35); transform:rotate(-4deg) translateY(60px) scale(.9); opacity:0; transition:all 1s var(--ease); }
+  .cardScene.on img { transform:rotate(-2deg) translateY(12px) scale(1); opacity:1; }
+  .cardScene .t { position:absolute; top:30px; left:0; right:0; text-align:center; font:400 30px/1 "Instrument Serif"; }
+  .cardScene .t em { font-style:italic; }
+
+  /* 5. end */
+  .end { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:0 36px; }
+  .end .kick { font:600 11px/1 "JetBrains Mono"; letter-spacing:.08em; text-transform:uppercase; opacity:.6; margin-bottom:18px; }
+  .end .cmd { font:700 25px/1 "JetBrains Mono"; background:var(--ink); color:var(--paper); padding:18px 20px; border-radius:12px; transform:rotate(-1.5deg); }
+  .end .cmd b { color:var(--butter); }
+  .end .lines { margin-top:30px; font:400 42px/1.02 "Instrument Serif"; letter-spacing:-.02em; }
+  .end .lines em { font-style:italic; color:var(--red); }
+  .end .meta { margin-top:30px; font:500 12px/1.7 "JetBrains Mono"; opacity:.75; }
+  .end > * { opacity:0; transform:translateY(14px); }
+  .end.on > * { animation:rise .7s var(--ease) forwards; }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+
+<section class="scene hook" id="s-hook">
+  <div class="mark"><span>claude-unwrapped</span><span id="range"></span></div>
+  <div class="l" style="animation-delay:.1s">My</div>
+  <div class="l" style="animation-delay:.4s">Claude Code,</div>
+  <div class="l i" style="animation-delay:.75s">unwrapped.</div>
+  <div class="sub" id="hooksub"></div>
+</section>
+
+<section class="scene termScene" id="s-term">
+  <div class="term" id="term"><div class="dots">● ● ●</div><div><span class="p">~ $ </span><span id="cmd" class="cur"></span></div><div id="out"></div></div>
+  <div class="cap">read from the logs on my machine</div>
+</section>
+
+<section class="scene storyScene" id="s-story">
+  <div class="caption"><span id="cap"></span></div>
+  <div class="phone" id="phone"><iframe id="story" src="story.html?manual"></iframe></div>
+  <div class="count" id="count"></div>
+</section>
+
+<section class="scene cardScene" id="s-card">
+  <div class="t">the <em>verdict.</em></div>
+  <img src="card.png" alt="">
+</section>
+
+<section class="scene end" id="s-end">
+  <div class="kick" style="animation-delay:.05s">make yours</div>
+  <div class="cmd" style="animation-delay:.2s"><b>$</b> npx claude-unwrapped</div>
+  <div class="lines" style="animation-delay:.5s">Runs on your machine.<br><em>Nothing uploaded.</em></div>
+  <div class="meta" style="animation-delay:.9s">free · open source · by devwithcoffee<br>github.com/himanshuSri24/claude-unwrapped</div>
+</section>
+
+<script>
+const FILM = /*__FILM__*/{ summary: [], range: "", sub: "" };
+const SUMMARY = FILM.summary;
+document.getElementById("range").textContent = FILM.range;
+document.getElementById("hooksub").textContent = FILM.sub;
+// captions keyed by the slide's kicker, so a slide the story skipped never gets the wrong one
+const CAPS = { cover: "<em>unwrapped.</em>", "time": "the hours", "multitasking": "how many Claudes at once", "the clock": "my Claude hour",
+  "tokens": "every token", "the bill you didn't get": "the bill I <em>didn't</em> get", "the conversation": "me vs Claude",
+  "your catchphrase": "my catchphrase", "the work": "the work", "where it went": "where it went", reveal: "and what that makes me" };
+const capFor = (el) => el.classList.contains("cover") ? CAPS.cover : el.classList.contains("reveal") ? CAPS.reveal
+  : CAPS[(el.querySelector(".kicker")?.textContent || "").trim().toLowerCase()] || "";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const cuts = [];
+const mark = () => cuts.push(performance.now() / 1000);
+function show(id) { document.querySelectorAll(".scene").forEach((s) => s.classList.toggle("on", s.id === id)); mark(); }
+
+async function typeTerm() {
+  const cmd = "npx claude-unwrapped";
+  for (let i = 0; i <= cmd.length; i++) { document.getElementById("cmd").textContent = cmd.slice(0, i); await sleep(48); }
+  document.getElementById("cmd").classList.remove("cur");
+  await sleep(250);
+  const out = document.getElementById("out");
+  for (const line of SUMMARY) {
+    const d = document.createElement("div"); d.className = "ln";
+    d.innerHTML = line.replace(/(The [A-Z][a-z]+(?: [A-Z][a-z]+)?)\./, '<span class="r">$1</span>.') || "&nbsp;";
+    out.appendChild(d); requestAnimationFrame(() => d.classList.add("on")); await sleep(120);
+  }
+}
+
+async function setCap(html) {
+  const c = document.getElementById("cap");
+  c.classList.add("out"); await sleep(160);
+  c.innerHTML = html; c.classList.remove("out");
+}
+
+async function run() {
+  await document.fonts.ready;
+  const frame = document.getElementById("story");
+  await new Promise((r) => (frame.contentDocument && frame.contentDocument.readyState === "complete") ? r() : frame.addEventListener("load", r, { once: true }));
+  const win = frame.contentWindow;
+  const key = (k) => win.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+  const slides = win.document.querySelectorAll(".slide").length;
+
+  window.__go = true;
+  show("s-hook"); await sleep(3600);
+  show("s-term"); await typeTerm(); await sleep(1500);
+
+  // restart the story so its first slide animates in view
+  key("ArrowRight"); key("ArrowLeft");
+  show("s-story");
+  const holds = [1900, 2000, 2300, 2100, 2000, 2000, 1900, 1900, 2000, 1700, 2300];
+  for (let i = 0; i < slides - 1; i++) {
+    setCap(capFor(win.document.querySelectorAll(".slide")[i]));
+    document.getElementById("count").textContent = `${String(i + 1).padStart(2, "0")} / ${slides}`;
+    await sleep(holds[i] || 1900);
+    key("ArrowRight"); if (i + 1 < slides - 1) mark();
+  }
+  show("s-card"); await sleep(3600);
+  show("s-end"); await sleep(4300);
+  window.__cuts = cuts.map((c) => +(c - cuts[0]).toFixed(3));
+  window.__done = true;
+}
+window.__start = run;
+</script>
+</body>
+</html>
