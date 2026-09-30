@@ -372,7 +372,7 @@ function buildSlides(S) {
       <div class="kicker rise">the work</div>
       <div class="lead rise" style="--d:100">Claude wrote</div>
       <div class="big mid rise" style="--d:250">${lines.num}${lines.abbr} <span class="unit">lines</span></div>
-      <div class="note rise" style="--d:400">across <b>${int(S.claude.filesTouched)} files</b>${S.claude.topFile ? `. The one you two kept coming back to: <b>${esc(S.claude.topFile.name)}</b>, ${S.claude.topFile.edits} edits` : ""}.</div>
+      <div class="note rise" style="--d:400">across <b>${int(S.claude.filesTouched)} files</b>${S.claude.topFile && !S.private ? `. The one you two kept coming back to: <b>${esc(S.claude.topFile.name)}</b>, ${S.claude.topFile.edits} edits` : ""}.</div>
       <div class="rows">${rows}</div>
       ${S.claude.commands.length ? `<div class="foot">favourite commands: ${S.claude.commands.slice(0, 4).map((c) => esc(c.name)).join(" · ")}</div>` : ""}`);
   }
