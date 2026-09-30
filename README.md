@@ -1,5 +1,8 @@
 # claude-unwrapped
 
+[![npm](https://img.shields.io/npm/v/claude-unwrapped?color=ff4a1c&label=npm)](https://www.npmjs.com/package/claude-unwrapped)
+[![zero dependencies](https://img.shields.io/badge/dependencies-0-17130e)](package.json)
+
 **Your Claude Code history, told as a story you can tap through.**
 
 ```sh
@@ -56,10 +59,34 @@ And the short version in your terminal:
   You are The Conductor.
 ```
 
+## A folder to post from
+
+Run it with no options and it asks two things, whether to show your project names and whether to
+make a video, then gives you a folder with everything you need to post, opens your story, and puts
+a LinkedIn caption filled in with your numbers on your clipboard. If the video needs ffmpeg and you
+don't have it, it offers to install it (winget on Windows, Homebrew on macOS) or tells you how.
+
+```
+claude-unwrapped-2026-09-30/
+  card.png          1080×1350, for LinkedIn and X
+  slides/01-11.png  1080×1920, for Instagram and WhatsApp stories
+  unwrapped.mp4     4:5 with music, about 45 seconds
+  post.txt          captions for LinkedIn and X, with your numbers in them
+  story.html        the interactive story
+```
+
+The images are drawn by the Chrome, Edge, Brave or Chromium you already have, driven directly over
+the DevTools protocol, so there's still nothing to install. The music is generated on your machine
+each time, so it's yours to post.
+
+The last slide of the story has **Post on X** and **Post on LinkedIn** buttons: they save the card,
+copy the caption and open the composer with it filled in, so all that's left is attaching the image.
+
 ## Options
 
 ```
-npx claude-unwrapped              everything on disk
+npx claude-unwrapped              asks what you want, step by step
+npx claude-unwrapped --export     the folder, without questions (add --no-video for images only)
 npx claude-unwrapped --days 30    just the last 30 days
 npx claude-unwrapped --private    hide project and file names (use this before you post)
 npx claude-unwrapped --demo       a made-up story, no logs needed
@@ -98,8 +125,8 @@ Claude Code deletes old transcripts after 30 days by default (`cleanupPeriodDays
 
 ## Privacy
 
-It reads files under your Claude config folder and writes one HTML file to your temp folder. It
-makes no network requests. The page itself loads its fonts from Google Fonts; your data is inlined
+It reads files under your Claude config folder and writes one HTML file to your temp folder (and the
+export folder, if you ask for one). It makes no network requests of its own. The page itself loads its fonts from Google Fonts; your data is inlined
 into the file and never sent anywhere. Your prompt text never goes into the page, apart from the
 catchphrase.
 
@@ -108,7 +135,8 @@ share card never shows them either way.
 
 ## Requirements
 
-Node 18 or newer. No dependencies.
+Node 18 or newer. No dependencies. For the export folder: Chrome, Edge, Brave or Chromium, plus
+ffmpeg for the video.
 
 ```sh
 git clone https://github.com/himanshuSri24/claude-unwrapped
@@ -122,4 +150,4 @@ Not affiliated with Anthropic. Claude and Claude Code are Anthropic's.
 If this made you laugh at your own "still not working" count, [a coffee](https://buymeacoffee.com/devwithcoffee) keeps
 the next one coming.
 
-MIT © Himanshu Srivastava
+MIT © Himanshu Srivastava · [devwithcoffee](https://devwithcoffee.com)

@@ -1,7 +1,7 @@
 {
   "name": "claude-unwrapped",
-  "version": "0.1.0",
-  "description": "Your Claude Code history, unwrapped. Reads the session logs already on your machine and turns them into a story you can share. Runs locally, uploads nothing.",
+  "version": "0.2.0",
+  "description": "Your Claude Code history, unwrapped: a story, a share card, story images and a video with music, from the logs already on your machine. Runs locally, uploads nothing.",
   "type": "module",
   "bin": {
     "claude-unwrapped": "bin/claude-unwrapped.mjs"
@@ -27,7 +27,10 @@
     "developer-stats",
     "ai",
     "tokens",
-    "local-first"
+    "local-first",
+    "claude-code-wrapped",
+    "share-card",
+    "year-in-review"
   ],
   "author": "Himanshu Srivastava (https://devwithcoffee.com)",
   "license": "MIT",
