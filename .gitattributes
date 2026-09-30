@@ -1,0 +1,5 @@
+# Always LF: the bin shebang breaks on macOS/Linux with CRLF ("env: node\r").
+* text=auto eol=lf
+*.png binary
+*.gif binary
+*.mp4 binary
