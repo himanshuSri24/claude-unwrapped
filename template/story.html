@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Code, unwrapped</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f2ece0;
+    --paper-2: #e8e0cf;
+    --ink: #17130e;
+    --ink-2: #4a4238;
+    --ink-3: #8a7f70;
+    --red: #ff4a1c;
+    --butter: #ffd84a;
+    --blue: #2b44ff;
+    --serif: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --sans: "Inter Tight", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: #1b1712;
+    color: var(--ink);
+    font-family: var(--sans);
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* The story frame: 9:16, as big as the window allows. */
+  .frame {
+    position: relative;
+    height: min(100vh, calc(100vw * 16 / 9));
+    aspect-ratio: 9 / 16;
+    max-height: 100vh;
+    overflow: hidden;
+    border-radius: min(2.2vh, 18px);
+    box-shadow: 0 30px 80px rgba(0,0,0,.45);
+    user-select: none;
+    container-type: size;
+  }
+  @media (max-aspect-ratio: 9/16) { .frame { border-radius: 0; height: 100vh; width: 100vw; aspect-ratio: auto; } }
+
+  .grain {
+    position: absolute; inset: 0; pointer-events: none; z-index: 30; mix-blend-mode: multiply; opacity: .35;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .45  0 0 0 0 .4  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  .bars { position: absolute; top: 2.2cqh; left: 5cqw; right: 5cqw; display: flex; gap: .8cqw; z-index: 40; }
+  .bars i { flex: 1; height: .45cqh; min-height: 3px; border-radius: 3px; background: color-mix(in srgb, currentColor 22%, transparent); overflow: hidden; }
+  .bars i b { display: block; height: 100%; width: 0; background: currentColor; }
+  .bars i.done b { width: 100%; }
+  .bars i.now b { animation: fill var(--dur, 7s) linear forwards; }
+  .paused .bars i.now b { animation-play-state: paused; }
+  @keyframes fill { to { width: 100%; } }
+
+  .brand {
+    position: absolute; top: 4.2cqh; left: 5cqw; right: 5cqw; z-index: 40;
+    display: flex; justify-content: space-between; align-items: center;
+    font: 600 1.55cqh/1 var(--mono); letter-spacing: .02em; text-transform: lowercase;
+  }
+  .brand span:last-child { opacity: .6; }
+
+  .slide {
+    position: absolute; inset: 0; padding: 12cqh 7cqw 8cqh;
+    display: flex; flex-direction: column; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity .35s var(--ease);
+    background: var(--paper); color: var(--ink);
+  }
+  .slide.on { opacity: 1; pointer-events: auto; }
+  .slide.dark { background: var(--ink); color: var(--paper); }
+  .slide.red { background: var(--red); color: var(--ink); }
+  .slide.butter { background: var(--butter); color: var(--ink); }
+  .slide.blue { background: var(--blue); color: var(--paper); }
+
+  .kicker { font: 600 1.7cqh/1.2 var(--mono); letter-spacing: .04em; text-transform: uppercase; opacity: .7; margin-bottom: 2.4cqh; }
+  .lead { font: 500 3.2cqh/1.2 var(--sans); letter-spacing: -.01em; }
+  .big { font: 400 16cqh/.86 var(--serif); letter-spacing: -.03em; margin: 1.2cqh 0 1.8cqh -.4cqw; font-variant-numeric: lining-nums; }
+  .big.mid { font-size: 11.5cqh; }
+  .big em, .serif em { font-style: italic; }
+  .unit { font: 400 5.2cqh/1 var(--serif); font-style: italic; }
+  .note { font: 400 2.25cqh/1.4 var(--sans); opacity: .82; max-width: 88%; }
+  .note b { font-weight: 700; opacity: 1; }
+  .foot { position: absolute; left: 7cqw; right: 7cqw; bottom: 5cqh; font: 400 1.55cqh/1.4 var(--mono); opacity: .55; }
+
+  /* Entrance: anything with .rise animates when its slide turns on. */
+  .rise { opacity: 0; transform: translateY(2.2cqh); }
+  .on .rise { animation: rise .7s var(--ease) forwards; animation-delay: calc(var(--d, 0) * 1ms); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  /* Cover */
+  .cover { justify-content: flex-end; padding-bottom: 14cqh; }
+  .cover .title { font: 400 12.5cqh/.82 var(--serif); letter-spacing: -.035em; }
+  .cover .title em { display: block; font-style: italic; }
+  .tape {
+    position: absolute; left: -10cqw; right: -10cqw; top: 17cqh; height: 6.5cqh; background: var(--red);
+    transform: rotate(-7deg) scaleX(0); transform-origin: left center;
+    display: flex; align-items: center; overflow: hidden; white-space: nowrap;
+    font: 700 2cqh/1 var(--mono); color: var(--ink); letter-spacing: .08em;
+  }
+  .on .tape { animation: tape .9s var(--ease) .25s forwards; }
+  @keyframes tape { to { transform: rotate(-7deg) scaleX(1); } }
+  .tape span { animation: marquee 18s linear infinite; padding-left: 2cqw; }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  .cover .meta { margin-top: 4cqh; font: 500 2.1cqh/1.5 var(--mono); }
+  .tap { position: absolute; bottom: 6cqh; left: 7cqw; font: 600 1.7cqh/1 var(--mono); opacity: .6; animation: blink 2s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  /* Calendar dots */
+  .cal { display: grid; grid-template-columns: repeat(14, 1fr); gap: .7cqw; margin-top: 3.4cqh; max-width: 92%; }
+  .cal i { aspect-ratio: 1; border-radius: 50%; background: color-mix(in srgb, currentColor 12%, transparent); transform: scale(0); }
+  .on .cal i { animation: pop .4s var(--ease) forwards; animation-delay: calc(var(--d) * 1ms); }
+  @keyframes pop { to { transform: scale(1); } }
+
+  /* Parallel Claudes */
+  .stack { position: relative; height: 31cqh; margin: 3.5cqh 0 2.5cqh; }
+  .term {
+    position: absolute; width: 50%; height: 10.5cqh; overflow: hidden; white-space: nowrap; border: 2px solid currentColor; border-radius: 1.2cqh;
+    background: var(--ink); padding: 1.1cqh 1.4cqw; font: 400 1.35cqh/1.45 var(--mono); color: var(--paper);
+    opacity: 0; transform: translateY(3cqh) scale(.96);
+  }
+  .term::before { content: "● ● ●"; display: block; font-size: 1.1cqh; letter-spacing: .3em; opacity: .5; margin-bottom: .6cqh; }
+  .term b { color: var(--butter); font-weight: 600; }
+  .on .term { animation: rise .55s var(--ease) forwards; animation-delay: calc(var(--d) * 1ms); }
+
+  /* Clock */
+  .clock { width: 78cqw; max-width: 48cqh; aspect-ratio: 1; margin: 1cqh auto 2.5cqh; }
+  .clock path { transform-origin: 50% 50%; transform: scale(0); }
+  .on .clock path { animation: pop .6s var(--ease) forwards; animation-delay: calc(var(--d) * 1ms); }
+
+  /* Bars */
+  .rows { display: grid; gap: 1.5cqh; margin-top: 3cqh; }
+  .row { display: grid; grid-template-columns: 30% 1fr auto; align-items: center; gap: 2.4cqw; font: 500 1.95cqh/1 var(--sans); }
+  .row .lbl { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .trk { display: block; height: 2.3cqh; }
+  .row .fill { display: block; height: 100%; width: 0; background: currentColor; border-radius: 0 .5cqh .5cqh 0; }
+  .on .row .fill { animation: grow 1s var(--ease) forwards; animation-delay: calc(var(--d) * 1ms); }
+  @keyframes grow { to { width: var(--w); } }
+  .row .val { font: 600 1.7cqh/1 var(--mono); min-width: 7ch; text-align: right; }
+
+  .split { display: flex; height: 5cqh; margin: 3cqh 0 1.4cqh; border: 2px solid currentColor; border-radius: 1cqh; overflow: hidden; }
+  .split i { display: block; height: 100%; width: 0; }
+  .on .split i { animation: grow 1.2s var(--ease) .4s forwards; }
+  .legend { display: flex; justify-content: space-between; font: 500 1.6cqh/1.3 var(--mono); }
+
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 5cqw; margin-top: 3cqh; }
+  .duo .n { font: 400 8cqh/.9 var(--serif); letter-spacing: -.02em; }
+  .duo .l { font: 500 1.7cqh/1.3 var(--mono); opacity: .75; margin-top: .8cqh; }
+
+  .quote { font: 400 13cqh/.9 var(--serif); font-style: italic; letter-spacing: -.03em; margin: 1cqh 0 1.5cqh; }
+  .quote::before { content: "\201C"; }
+  .quote::after { content: "\201D"; }
+  .times { display: inline-block; font: 700 2.4cqh/1 var(--mono); background: var(--ink); color: var(--butter); padding: .9cqh 1.6cqw; border-radius: .8cqh; transform: rotate(-3deg); }
+  .chips { display: flex; flex-wrap: wrap; gap: 1cqh 2cqw; margin-top: 4.5cqh; }
+  .chip { border: 2px solid currentColor; border-radius: 99px; padding: 1cqh 2.6cqw; font: 500 1.8cqh/1 var(--sans); }
+  .chip b { font-family: var(--mono); margin-right: .6ch; }
+
+  .reveal .you { font: 500 2.6cqh/1 var(--mono); text-transform: uppercase; letter-spacing: .1em; opacity: .7; }
+  .reveal .name { font: 400 14cqh/.84 var(--serif); letter-spacing: -.035em; margin: 2cqh 0 3cqh; }
+  .reveal .name em { font-style: italic; display: block; }
+  .stamp {
+    position: absolute; right: 6cqw; top: 14cqh; width: 17cqh; height: 17cqh; border-radius: 50%;
+    border: 3px solid currentColor; display: grid; place-items: center; text-align: center;
+    font: 700 1.5cqh/1.25 var(--mono); letter-spacing: .08em; text-transform: uppercase;
+    transform: rotate(14deg) scale(2.5); opacity: 0;
+  }
+  .on .stamp { animation: stamp .45s cubic-bezier(.3,1.6,.5,1) 1.1s forwards; }
+  @keyframes stamp { to { transform: rotate(14deg) scale(1); opacity: 1; } }
+
+  /* Share slide */
+  .share { justify-content: flex-start; padding-top: 9cqh; background: var(--paper-2); }
+  .share canvas { width: 100%; height: auto; border-radius: 1.2cqh; box-shadow: 0 1.5cqh 4cqh rgba(0,0,0,.18); }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2cqh 2.4cqw; margin-top: 2.6cqh; }
+  .actions button {
+    font: 600 1.9cqh/1 var(--sans); padding: 1.8cqh 0; border-radius: 99px; cursor: pointer;
+    border: 2px solid var(--ink); background: transparent; color: var(--ink); transition: transform .15s;
+  }
+  .actions button.primary { background: var(--ink); color: var(--paper); grid-column: span 2; }
+  .actions button:active { transform: scale(.97); }
+  .toast { position: absolute; left: 50%; bottom: 3cqh; transform: translateX(-50%); background: var(--ink); color: var(--paper); font: 500 1.7cqh/1 var(--sans); padding: 1.4cqh 3cqw; border-radius: 99px; opacity: 0; transition: opacity .25s; z-index: 50; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  .nav { position: absolute; inset: 0; z-index: 20; display: grid; grid-template-columns: 1fr 2fr; }
+  .share .nav, .nav.off { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
+  }
+  .still *, .still *::before, .still *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition: none !important; }
+</style>
+</head>
+<body>
+<div class="frame" id="frame">
+  <div class="grain"></div>
+  <div class="bars" id="bars"></div>
+  <div class="brand"><span>claude-unwrapped</span><span id="brandRange"></span></div>
+  <div id="slides"></div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+const STORY = /*__STORY__*/null;
+
+// ---------- formatting ----------
+const nf = new Intl.NumberFormat("en-US");
+const int = (n) => nf.format(Math.round(n));
+function compact(n) {
+  const units = [[1e12, "trillion", "T"], [1e9, "billion", "B"], [1e6, "million", "M"], [1e3, "thousand", "k"]];
+  for (const [v, w, abbr] of units) if (n >= v) {
+    const x = n / v;
+    return { abbr, num: x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1).replace(/\.0$/, "") : x.toFixed(2).replace(/0$/, "").replace(/\.$/, ""), word: w };
+  }
+  return { num: int(n), word: "", abbr: "" };
+}
+const usd = (n) => "$" + (n >= 100 ? int(n) : n.toFixed(2));
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const dshort = (t) => { const d = new Date(t); return `${d.getDate()} ${MONTHS[d.getMonth()]}`; };
+const dlong = (t) => { const d = new Date(t); return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`; };
+const clock = (t) => { const d = new Date(t); let h = d.getHours(); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return `${h}:${String(d.getMinutes()).padStart(2, "0")} ${ap}`; };
+const hourName = (h) => h === 0 ? "midnight" : h === 12 ? "noon" : h < 12 ? `${h} AM` : `${h - 12} PM`;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const plural = (n, w, ws) => `${int(n)} ${n === 1 ? w : ws || w + "s"}`;
+
+// ---------- slides ----------
+// Each slide is { cls, dur, html }. A slide only exists when its numbers say
+// something; an empty log should not get a "0 hours" slide.
+function buildSlides(S) {
+  const out = [];
+  const add = (cls, html, dur = 7000) => out.push({ cls, html, dur });
+  const hrs = S.time.hours;
+  const hrsTxt = hrs >= 10 ? int(hrs) : hrs.toFixed(1);
+
+  add("cover", `
+    <div class="kicker rise">${S.range.first ? `${dshort(S.range.first)} – ${dlong(S.range.last)}` : ""}</div>
+    <div class="title rise" style="--d:120">Your<br>Claude Code,<em>unwrapped.</em></div>
+    <div class="meta rise" style="--d:500">${plural(S.sessions.yours, "session")} · ${plural(S.sessions.activeDays, "day")} · ${plural(S.you.promptCount, "prompt")}</div>
+    <div class="tape"><span>${"NOTHING LEFT YOUR MACHINE · ".repeat(12)}</span></div>
+    <div class="tap">tap to open →</div>`, 5200);
+
+  if (hrs > 0) {
+    const cal = S.time.calendar;
+    const max = Math.max(...cal.map((c) => c[1]), 0.01);
+    const dots = cal.slice(-56).map(([, h], i) => {
+      const a = Math.min(1, 0.18 + (h / max) * 0.82);
+      return `<i style="--d:${500 + i * 18};background:color-mix(in srgb, var(--red) ${Math.round(a * 100)}%, transparent)"></i>`;
+    }).join("");
+    const workdays = hrs / 8;
+    add("", `
+      <div class="kicker rise">time</div>
+      <div class="lead rise" style="--d:100">You and Claude spent</div>
+      <div class="big rise" style="--d:250"><span data-count="${hrs}" data-dec="${hrs >= 10 ? 0 : 1}">${hrsTxt}</span> <span class="unit">hours</span></div>
+      <div class="note rise" style="--d:450">heads-down together. ${workdays >= 1 ? `That's <b>${workdays >= 10 ? int(workdays) : workdays.toFixed(1)} full workdays</b>.` : ""}
+      ${S.time.busiestDay ? `Your biggest day was <b>${DAYS[new Date(S.time.busiestDay.day + "T12:00").getDay()]}, ${dshort(S.time.busiestDay.day + "T12:00")}</b>: ${S.time.busiestDay.hours.toFixed(1)} hours.` : ""}</div>
+      <div class="cal">${dots}</div>
+      ${S.time.streak.days > 2 ? `<div class="foot">longest streak: ${S.time.streak.days} days in a row</div>` : ""}`);
+  }
+
+  if (S.peak.count >= 2 || S.headless.runs > 0) {
+    const n = Math.min(S.peak.count, 7);
+    const lines = ["<b>›</b> fix the flaky test", "<b>›</b> ship the landing page", "<b>›</b> refactor auth", "<b>›</b> why is this 500ing", "<b>›</b> write the migration", "<b>›</b> go on", "<b>›</b> add dark mode"];
+    const terms = Array.from({ length: n }, (_, i) => {
+      const x = (i % 2 ? 46 : 2) + (i % 3) * 1.5, y = n > 1 ? i * (20.5 / (n - 1)) : 6;
+      return `<div class="term" style="left:${x}%;top:${y}cqh;--d:${400 + i * 260};z-index:${i}">claude ${i + 1}<br>${lines[i % lines.length]}</div>`;
+    }).join("");
+    add("dark", `
+      <div class="kicker rise">multitasking</div>
+      ${S.peak.count >= 2 ? `
+      <div class="lead rise" style="--d:100">At your peak,</div>
+      <div class="big mid rise" style="--d:200">${S.peak.count} <span class="unit">Claudes</span></div>
+      <div class="lead rise" style="--d:300">were working for you at the same time.</div>
+      <div class="stack">${terms}</div>` : ""}
+      <div class="note rise" style="--d:${400 + n * 260}">${S.peak.at ? `${DAYS[new Date(S.peak.at).getDay()]} ${dshort(S.peak.at)}, ${clock(S.peak.at)}.` : ""}
+      ${S.headless.runs ? ` And <b>${int(S.headless.runs)}</b> more ran headless, no one watching (<code style="white-space:nowrap">claude -p</code>).` : ""}</div>`, 8000);
+  }
+
+  if (S.you.promptCount > 0) {
+    const h = S.time.hoursOfDay, max = Math.max(...h, 1);
+    const cx = 100, cy = 100, r0 = 16, r1 = 82;
+    const wedges = h.map((v, i) => {
+      const a0 = (i / 24) * Math.PI * 2 - Math.PI / 2 + 0.02, a1 = ((i + 1) / 24) * Math.PI * 2 - Math.PI / 2 - 0.02;
+      const r = r0 + (r1 - r0) * (v / max);
+      const p = (a, rr) => `${(cx + Math.cos(a) * rr).toFixed(2)} ${(cy + Math.sin(a) * rr).toFixed(2)}`;
+      const night = i >= 22 || i < 5;
+      return `<path d="M${p(a0, r0)} L${p(a0, r)} A${r} ${r} 0 0 1 ${p(a1, r)} L${p(a1, r0)} A${r0} ${r0} 0 0 0 ${p(a0, r0)}Z" fill="${i === S.time.peakHour ? "var(--red)" : night ? "var(--blue)" : "currentColor"}" opacity="${v ? 1 : .12}" style="--d:${300 + i * 35}"/>`;
+    }).join("");
+    const ticks = [0, 6, 12, 18].map((t) => {
+      const a = (t / 24) * Math.PI * 2 - Math.PI / 2;
+      return `<text x="${cx + Math.cos(a) * 93}" y="${cy + Math.sin(a) * 93 + 2.4}" text-anchor="middle" font-size="8.5" font-weight="600" font-family="JetBrains Mono" fill="currentColor" opacity=".6">${["midnight", "6 am", "noon", "6 pm"][t / 6]}</text>`;
+    }).join("");
+    const night = Math.round(S.rates.night * 100);
+    add("butter", `
+      <div class="kicker rise">the clock</div>
+      <div class="lead rise" style="--d:100">Your Claude hour is</div>
+      <div class="big mid rise" style="--d:200"><em>${hourName(S.time.peakHour)}</em></div>
+      <svg class="clock" viewBox="-16 -8 232 216">${wedges}${ticks}</svg>
+      <div class="note rise" style="--d:1200">${night >= 5 ? `<b>${night}%</b> of your prompts were sent between 10 PM and 5 AM. ` : ""}${S.time.latest ? `Latest one: <b>${clock(S.time.latest)}</b>, ${DAYS[new Date(S.time.latest).getDay()]} ${dshort(S.time.latest)}.` : ""}</div>`, 7500);
+  }
+
+  if (S.tokens.total > 0) {
+    const t = compact(S.tokens.total);
+    const wp = S.tokens.total / 780000; // War and Peace is ~587k words, ~780k tokens
+    const cache = Math.round(S.tokens.cacheShare * 100);
+    add("", `
+      <div class="kicker rise">tokens</div>
+      <div class="lead rise" style="--d:100">Claude read and wrote</div>
+      <div class="big rise" style="--d:250">${t.num}<span class="unit"> ${t.word}</span></div>
+      <div class="lead rise" style="--d:350">tokens.</div>
+      <div class="note rise" style="--d:450">About <b>${wp >= 10 ? int(wp) : wp.toFixed(1)} copies of <em>War and Peace</em></b>.</div>
+      ${cache >= 1 ? `
+      <div class="split rise" style="--d:600"><i style="--w:${cache}%;background:var(--ink)"></i><i style="--w:${100 - cache}%;background:var(--red)"></i></div>
+      <div class="legend rise" style="--d:700"><span>${cache}% re-reading context it already had</span><span>${100 - cache}% new</span></div>
+      <div class="foot">that's prompt caching doing its job: it's why long sessions don't cost a fortune</div>` : ""}`);
+  }
+
+  if (S.cost.usd >= 1) {
+    const top = S.models.filter((m) => m.cost).slice(0, 4);
+    const max = Math.max(...top.map((m) => m.cost), 1);
+    const rows = top.map((m, i) => `<div class="row"><span class="lbl">${esc(m.name)}</span><span class="trk"><span class="fill" style="--w:${Math.max(2, (m.cost / max) * 100)}%;--d:${700 + i * 140}"></span></span><span class="val">${usd(m.cost)}</span></div>`).join("");
+    add("red", `
+      <div class="kicker rise">the bill you didn't get</div>
+      <div class="lead rise" style="--d:100">At API prices, all of that comes to</div>
+      <div class="big rise" style="--d:250">${usd(S.cost.usd)}</div>
+      <div class="note rise" style="--d:450">${S.cost.usd > 200 ? `On a $200 Max plan that's <b>${(S.cost.usd / 200).toFixed(1)} months</b> of subscription.` : "Claude Code on a plan: not a bad deal."}</div>
+      <div class="rows">${rows}</div>
+      <div class="foot">list prices, first-party API. what you paid depends on your plan.</div>`);
+  }
+
+  if (S.you.words > 0 && S.claude.words > 0) {
+    const yw = compact(S.you.words), cw = compact(S.claude.words);
+    const ratio = S.claude.wordsPerYourWord;
+    add("blue", `
+      <div class="kicker rise">the conversation</div>
+      <div class="duo">
+        <div class="rise" style="--d:150"><div class="n">${yw.num}${yw.abbr}</div><div class="l">words from you</div></div>
+        <div class="rise" style="--d:350"><div class="n">${cw.num}${cw.abbr}</div><div class="l">words from Claude</div></div>
+      </div>
+      <div class="lead rise" style="--d:650;margin-top:5cqh">${ratio >= 1.5 ? `For every word you wrote, Claude wrote <b>${ratio.toFixed(1)}</b> back.` : ratio < 0.8 ? `You out-wrote Claude. Respect.` : "An even conversation."}</div>
+      <div class="note rise" style="--d:850;margin-top:2cqh">Your typical prompt: <b>${plural(Math.round(S.you.medianPromptWords), "word")}</b>. Claude also thought silently <b>${int(S.claude.thinking)}</b> times before answering.</div>`);
+  }
+
+  if (S.you.catchphrase || S.you.phrases.please || S.you.phrases.stillBroken) {
+    const p = S.you.phrases;
+    const chips = [
+      p.please && `<span class="chip"><b>${p.please}×</b>please</span>`,
+      p.thanks && `<span class="chip"><b>${p.thanks}×</b>thank you</span>`,
+      p.stillBroken && `<span class="chip"><b>${p.stillBroken}×</b>still not working</span>`,
+      p.sorry && `<span class="chip"><b>${p.sorry}×</b>sorry</span>`,
+      p.swears && `<span class="chip"><b>${p.swears}×</b>words we won't print</span>`,
+      S.you.interrupts && `<span class="chip"><b>${S.you.interrupts}×</b>hit Esc mid-answer</span>`,
+    ].filter(Boolean).map((c, i) => c.replace('class="chip"', `class="chip rise" style="--d:${800 + i * 120}"`)).join("");
+    add("", `
+      <div class="kicker rise">your catchphrase</div>
+      ${S.you.catchphrase ? `
+      <div class="quote rise" style="--d:200">${esc(S.you.catchphrase.text)}</div>
+      <span class="times rise" style="--d:500;align-self:flex-start">× ${S.you.catchphrase.count}</span>` : `<div class="lead rise" style="--d:200">The things you kept saying:</div>`}
+      <div class="chips">${chips}</div>`);
+  }
+
+  if (S.claude.toolCalls > 0) {
+    const tools = S.claude.tools.slice(0, 5), max = Math.max(...tools.map((t) => t.n), 1);
+    const rows = tools.map((t, i) => `<div class="row"><span class="lbl">${esc(t.name)}</span><span class="trk"><span class="fill" style="--w:${Math.max(2, (t.n / max) * 100)}%;--d:${700 + i * 120};background:${i ? "currentColor" : "var(--red)"}"></span></span><span class="val">${int(t.n)}</span></div>`).join("");
+    const lines = compact(S.claude.linesWritten);
+    add("dark", `
+      <div class="kicker rise">the work</div>
+      <div class="lead rise" style="--d:100">Claude wrote</div>
+      <div class="big mid rise" style="--d:250">${lines.num}${lines.abbr} <span class="unit">lines</span></div>
+      <div class="note rise" style="--d:400">across <b>${int(S.claude.filesTouched)} files</b>${S.claude.topFile ? `. The one you two kept coming back to: <b>${esc(S.claude.topFile.name)}</b>, ${S.claude.topFile.edits} edits` : ""}.</div>
+      <div class="rows">${rows}</div>
+      ${S.claude.commands.length ? `<div class="foot">favourite commands: ${S.claude.commands.slice(0, 4).map((c) => esc(c.name)).join(" · ")}</div>` : ""}`);
+  }
+
+  if (S.projects.length >= 2) {
+    const max = S.projects[0].edits;
+    const rows = S.projects.slice(0, 6).map((p, i) => `<div class="row"><span class="lbl">${esc(p.name)}</span><span class="trk"><span class="fill" style="--w:${Math.max(3, (p.edits / max) * 100)}%;--d:${500 + i * 120}"></span></span><span class="val">${int(p.edits)}</span></div>`).join("");
+    add("butter", `
+      <div class="kicker rise">where it went</div>
+      <div class="lead rise" style="--d:100">Claude touched</div>
+      <div class="big mid rise" style="--d:200">${S.projectCount} <span class="unit">projects</span></div>
+      <div class="note rise" style="--d:350">Most edits landed here:</div>
+      <div class="rows">${rows}</div>`);
+  }
+
+  const a = S.archetype;
+  const [first, ...rest] = a.name.split(" ");
+  add("red reveal", `
+    <div class="you rise">you are</div>
+    <div class="name rise" style="--d:300">${esc(first)}<em>${esc(rest.join(" "))}</em></div>
+    <div class="lead rise" style="--d:700">${esc(a.line)}</div>
+    <div class="stamp">certified<br>by your<br>own logs</div>`, 6500);
+
+  add("share", `
+    <canvas id="card" width="1080" height="1350"></canvas>
+    <div class="actions">
+      <button class="primary" id="save">Save image</button>
+      <button id="copy">Copy text</button>
+      <button id="replay">Watch again</button>
+    </div>`, 0);
+  return out;
+}
+
+// ---------- share card (canvas, so the PNG is exactly what you see) ----------
+function drawCard(S) {
+  const c = document.getElementById("card"), g = c.getContext("2d");
+  const W = 1080, H = 1350, P = 84;
+  g.fillStyle = "#f2ece0"; g.fillRect(0, 0, W, H);
+
+  // grain
+  const img = g.getImageData(0, 0, W, H), d = img.data;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < d.length; i += 4) { const n = (rnd() - .5) * 16; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  g.putImageData(img, 0, 0);
+
+  const ink = "#17130e";
+  g.fillStyle = ink;
+  g.font = "600 26px 'JetBrains Mono'";
+  g.fillText("claude-unwrapped", P, P + 10);
+  g.textAlign = "right";
+  g.fillText(S.range.first ? `${dshort(S.range.first)} – ${dlong(S.range.last)}`.toUpperCase() : "", W - P, P + 10);
+  g.textAlign = "left";
+
+  g.font = "400 110px 'Instrument Serif'";
+  g.fillText("My Claude Code,", P, 270);
+  g.font = "italic 400 110px 'Instrument Serif'";
+  g.fillText("unwrapped.", P, 375);
+
+  // tape with the archetype
+  g.save();
+  g.translate(W / 2, 505); g.rotate(-0.05);
+  g.fillStyle = "#ff4a1c"; g.fillRect(-W, -58, W * 2, 116);
+  g.fillStyle = ink; g.font = "italic 400 76px 'Instrument Serif'"; g.textAlign = "center";
+  g.fillText(S.archetype.name, 0, 24);
+  g.restore();
+
+  const t = compact(S.tokens.total);
+  const stats = [
+    [S.time.hours >= 10 ? int(S.time.hours) : S.time.hours.toFixed(1), "hours with Claude"],
+    [t.num + t.abbr, "tokens"],
+    [usd(S.cost.usd), "at API prices"],
+    [String(Math.max(1, S.peak.count)), "Claudes at once, peak"],
+  ];
+  const colW = (W - P * 2) / 2;
+  stats.forEach(([n, l], i) => {
+    const x = P + (i % 2) * colW, y = 700 + Math.floor(i / 2) * 210;
+    g.fillStyle = ink; g.font = "400 124px 'Instrument Serif'"; g.textAlign = "left";
+    g.fillText(n, x, y);
+    g.font = "500 27px 'JetBrains Mono'"; g.fillStyle = "#4a4238";
+    g.fillText(l, x + 4, y + 48);
+  });
+
+  g.strokeStyle = ink; g.lineWidth = 3;
+  g.beginPath(); g.moveTo(P, 1075); g.lineTo(W - P, 1075); g.stroke();
+
+  g.fillStyle = ink; g.font = "500 30px 'Inter Tight'";
+  const facts = [];
+  if (S.you.catchphrase) facts.push(`catchphrase: “${S.you.catchphrase.text}” × ${S.you.catchphrase.count}`);
+  facts.push(`claude hour: ${hourName(S.time.peakHour)}${S.models[0] ? ` · top model: ${S.models[0].name}` : ""}`);
+  if (S.claude.linesWritten) facts.push(`${int(S.claude.linesWritten)} lines written · ${int(S.claude.toolCalls)} tool calls`);
+  facts.slice(0, 3).forEach((f, i) => g.fillText(f, P, 1135 + i * 48));
+
+  g.font = "600 25px 'JetBrains Mono'"; g.fillStyle = "#8a7f70";
+  g.fillText("npx claude-unwrapped", P, H - 50);
+  g.textAlign = "right"; g.fillText("nothing left my machine", W - P, H - 50); g.textAlign = "left";
+}
+
+function shareText(S) {
+  const t = compact(S.tokens.total);
+  return [
+    `My Claude Code, unwrapped (${S.range.first ? dshort(S.range.first) + " – " + dlong(S.range.last) : ""}):`,
+    ``,
+    `${S.time.hours >= 10 ? int(S.time.hours) : S.time.hours.toFixed(1)} hours with Claude`,
+    `${t.num} ${t.word} tokens (${usd(S.cost.usd)} at API prices)`,
+    S.peak.count >= 2 ? `${S.peak.count} Claudes running at once, at peak` : null,
+    S.you.catchphrase ? `catchphrase: "${S.you.catchphrase.text}" × ${S.you.catchphrase.count}` : null,
+    ``,
+    `I'm ${S.archetype.name}.`,
+    ``,
+    `npx claude-unwrapped`,
+  ].filter((x) => x !== null).join("\n");
+}
+
+// ---------- player ----------
+const frame = document.getElementById("frame");
+const q = new URLSearchParams(location.search);
+const still = q.has("still");
+if (still) frame.classList.add("still");
+
+function empty() {
+  document.getElementById("slides").innerHTML = `<section class="slide on"><div class="kicker">claude-unwrapped</div><div class="lead">No Claude Code sessions found yet.</div><div class="note" style="margin-top:2cqh">Use Claude Code for a while, then run <b>npx claude-unwrapped</b> again.</div></section>`;
+}
+
+if (!STORY || !STORY.sessions || (!STORY.sessions.yours && !STORY.headless.runs)) empty();
+else {
+  const slides = buildSlides(STORY);
+  const host = document.getElementById("slides");
+  host.innerHTML = slides.map((s, i) => `<section class="slide ${s.cls}" data-i="${i}">${s.html}<div class="nav"><div data-go="-1"></div><div data-go="1"></div></div></section>`).join("");
+  document.getElementById("brandRange").textContent = STORY.private ? "private mode" : "";
+  const bars = document.getElementById("bars");
+  bars.innerHTML = slides.map(() => "<i><b></b></i>").join("");
+  const els = [...host.children], barEls = [...bars.children];
+  let cur = -1, timer = null, paused = false, left = 0, started = 0;
+
+  const countUp = (el) => {
+    const to = +el.dataset.count, dec = +el.dataset.dec || 0, t0 = performance.now(), dur = 1400;
+    const step = (now) => {
+      const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4);
+      el.textContent = dec ? (to * e).toFixed(dec) : int(to * e);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+
+  function show(i) {
+    i = Math.max(0, Math.min(slides.length - 1, i));
+    if (i === cur) return;
+    cur = i;
+    els.forEach((el, k) => el.classList.toggle("on", k === i));
+    const sl = slides[i];
+    const dark = /dark|blue/.test(sl.cls);
+    frame.style.color = dark ? "var(--paper)" : "var(--ink)";
+    barEls.forEach((b, k) => { b.className = k < i ? "done" : k === i ? "now" : ""; });
+    // restart the running bar
+    const nb = barEls[i].firstChild; nb.style.animation = "none"; void nb.offsetWidth; nb.style.animation = "";
+    barEls[i].style.setProperty("--dur", (sl.dur || 1) + "ms");
+    if (sl.dur === 0) barEls[i].className = "done";
+    if (!still) els[i].querySelectorAll("[data-count]").forEach(countUp);
+    if (sl.cls === "share") document.fonts.ready.then(() => drawCard(STORY));
+    schedule(sl.dur);
+    try { history.replaceState(null, "", "#" + i); } catch {}
+  }
+  function schedule(ms) {
+    clearTimeout(timer);
+    if (!ms || still || q.has("manual")) return;
+    left = ms; started = Date.now();
+    timer = setTimeout(() => show(cur + 1), ms);
+  }
+  function pause(on) {
+    if (on === paused || !slides[cur].dur) return;
+    paused = on; frame.classList.toggle("paused", on);
+    if (on) { clearTimeout(timer); left -= Date.now() - started; }
+    else { started = Date.now(); timer = setTimeout(() => show(cur + 1), Math.max(300, left)); }
+  }
+
+  host.addEventListener("click", (e) => {
+    const go = e.target.closest("[data-go]");
+    if (go && !held) show(cur + +go.dataset.go);
+  });
+  let held = false, holdT = null;
+  host.addEventListener("pointerdown", (e) => { if (!e.target.closest(".nav")) return; holdT = setTimeout(() => { held = true; pause(true); }, 220); });
+  addEventListener("pointerup", () => { clearTimeout(holdT); if (held) { pause(false); setTimeout(() => (held = false), 0); } });
+  addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); show(cur + 1); }
+    else if (e.key === "ArrowLeft") show(cur - 1);
+    else if (e.key === "s") show(slides.length - 1);
+    else if (e.key === "p") pause(!paused);
+  });
+
+  const toast = (msg) => { const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); };
+  document.addEventListener("click", async (e) => {
+    if (e.target.id === "save") {
+      const a = document.createElement("a");
+      a.download = "claude-unwrapped.png";
+      a.href = document.getElementById("card").toDataURL("image/png");
+      a.click();
+      toast("Saved claude-unwrapped.png");
+    } else if (e.target.id === "copy") {
+      try { await navigator.clipboard.writeText(shareText(STORY)); toast("Copied. Paste it with the image."); }
+      catch { toast("Clipboard blocked by the browser"); }
+    } else if (e.target.id === "replay") show(0);
+  });
+
+  const start = parseInt(q.get("slide") ?? location.hash.slice(1), 10);
+  show(Number.isFinite(start) ? start : 0);
+}
+</script>
+</body>
+</html>
