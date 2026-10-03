@@ -5,7 +5,7 @@ import { rmSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeFixture } from "./fixture.mjs";
-import { readAll, projectOf } from "../lib/read.mjs";
+import { readAll, projectOf, emptyTotals, ingest } from "../lib/read.mjs";
 import { buildStory, stretches, unionMs, peakOverlap, catchphrase, longestStreak } from "../lib/stats.mjs";
 import { costOf, prettyModel, priceFor } from "../lib/pricing.mjs";
 import { render } from "../lib/render.mjs";
@@ -55,6 +55,26 @@ test("time is wall clock: idle gaps end a stretch, overlaps count once", () => {
   // s1: 0..11 then 190..195; s2: 2..6 sits inside s1's first stretch
   assert.equal(story.time.hours * 60, 16);
   assert.equal(story.peak.count, 2);
+});
+
+test("a forked session's copied history is read once", () => {
+  // --fork-session (and a session carried over elsewhere) starts the new file
+  // with the old conversation: same uuids and timestamps, new sessionId.
+  const at = (min) => new Date(Date.parse("2026-09-01T09:00:00Z") + min * 60000).toISOString();
+  const line = (sid, uuid, min, type, content, id) => ({
+    type, uuid, sessionId: sid, timestamp: at(min), cwd: "/work", entrypoint: "cli",
+    message: type === "user" ? { role: "user", content }
+      : { id, model: "claude-opus-5-5", role: "assistant", content: [{ type: "text", text: content }], usage: { input_tokens: 1, output_tokens: 10 } },
+  });
+  const old = [line("a", "u1", 0, "user", "go on"), line("a", "u2", 1, "assistant", "done", "m1"), line("a", "u3", 2, "user", "go on")];
+  const fork = [...old.map((o) => ({ ...o, sessionId: "b", forkedFrom: { sessionId: "a" } })), line("b", "u4", 30, "user", "go on")];
+  const t = emptyTotals();
+  for (const o of [...old, ...fork]) ingest(t, o);
+  const s = buildStory(t);
+  assert.equal(s.you.promptCount, 3);
+  assert.equal(t.claudeWords, 1);
+  assert.equal(t.usage["claude-opus-5-5"].output, 10);
+  assert.equal(s.peak.count, 1, "the copy is not a second Claude running alongside");
 });
 
 test("catchphrase needs 3+ repeats and never looks like a path or a secret", () => {
